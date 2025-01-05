@@ -1,7 +1,11 @@
+#external_components:
+#  - source:
+#      type: local
+#      path: components
+
 external_components:
-  - source:
-      type: local
-      path: components
+  - source: github://mvirkkunen/esphome-webasto
+    components: [ webasto ]
 
 uart:
   baud_rate: 10400
@@ -9,6 +13,7 @@ uart:
   rx_pin: 23
 
 webasto:
+  update_interval: 1500ms
   heater:
     name: "Webasto Heater"
   temperature:

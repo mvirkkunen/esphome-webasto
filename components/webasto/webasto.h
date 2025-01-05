@@ -81,7 +81,7 @@ private:
     unsigned init_attempts = 0;
     bool heater_on = false;
     bool heater_sync = false;
-    uint32_t update_interval = 10000;
+    uint32_t update_interval = 1500;
     sensor::Sensor *temperature_sensor = nullptr;
     sensor::Sensor *battery_voltage_sensor = nullptr;
     text_sensor::TextSensor *faults_sensor = nullptr;

@@ -19,6 +19,7 @@ extern const std::unordered_map<int, const char*> STATE_NAMES;
 #define TAG "webasto"
 
 const Bytes CMD_START_COMM =   { 0x81, 0x51, 0xf1, 0x81, 0x44 };
+const Bytes CMD_SET_MODE =     { 0x82, 0x51, 0xf1, 0x31, 0x03, 0xf8 };
 const Bytes CMD_READ_STATE_1 = { 0x83, 0x51, 0xf1, 0x2a, 0x01, 0x01, 0xf1 };
 const Bytes CMD_READ_STATE_2 = { 0x83, 0x51, 0xf1, 0x2a, 0x01, 0x02, 0xf2 };
 const Bytes CMD_READ_FAULTS =  { 0x81, 0x51, 0xf1, 0xa1, 0x64 };
@@ -36,7 +37,7 @@ enum class WebastoComponent::CommState {
     INIT_BREAK_2, // 25ms
     INIT_SLEEP_2, // 100ms
     INIT_START_COMM,
-    INIT_START_WAIT,
+    INIT_SET_MODE,
     READ_STATE_1,
     READ_STATE_2,
     READ_FAULTS,
@@ -133,6 +134,10 @@ uint32_t WebastoComponent::comm_state_enter() {
             send_command(CMD_START_COMM);
             return CMD_TIMEOUT;
 
+        case CommState::INIT_SET_MODE:
+            send_command(CMD_SET_MODE);
+            return CMD_TIMEOUT;
+
         case CommState::READ_STATE_1:
             send_command(CMD_READ_STATE_1);
             return CMD_TIMEOUT;
@@ -177,6 +182,14 @@ WebastoComponent::CommState WebastoComponent::comm_state_complete(const Bytes& r
                 ESP_LOGE(TAG, "invalid reply length for INIT_START_COMM: %d", reply.size());
                 init_attempts++;
                 return (init_attempts > 3) ? CommState::INIT_START_SYNC : CommState::INIT_START_COMM;
+            }
+
+            return CommState::INIT_SET_MODE;
+
+        case CommState::INIT_SET_MODE:
+            if (reply.size() < 7) {
+                ESP_LOGE(TAG, "invalid reply length for INIT_SET_MODE: %d", reply.size());
+                return CommState::INIT_START_SYNC;
             }
 
             return CommState::READ_STATE_1;
