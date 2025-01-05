@@ -318,15 +318,15 @@ void WebastoComponent::update_sensors() {
         ss << "Glow plug: " << state.glow_plug << " %\n";
         ss << "Flame detector: " << state.flame_detector << " Ω\n";
 
-        if (state.combustion_air_fan_on) ss << " [CAF]";
-        if (state.fuel_pump_on) ss << " [FP]";
-        if (state.glow_plug_on) ss << " [GP]";
-        if (state.circulating_pump_on) ss << " [CP]";
-        if (state.vehicle_fan_relay_on) ss << " [VFR]";
-        if (state.main_switch_on) ss << " [MS]";
-        if (state.supplemental_heater_request) ss << " [SHR]";
-        if (state.summer) ss << " [S]";
-        if (state.flame_detected) ss << " [FD]";
+        if (state.combustion_air_fan_on) ss << "[CAF] ";
+        if (state.fuel_pump_on) ss << "[FP] ";
+        if (state.glow_plug_on) ss << "[GP] ";
+        if (state.circulating_pump_on) ss << "[CP] ";
+        if (state.vehicle_fan_relay_on) ss << "[VFR] ";
+        if (state.main_switch_on) ss << "[MS] ";
+        if (state.supplemental_heater_request) ss << "[SHR] ";
+        if (state.summer) ss << "[S] ";
+        if (state.flame_detected) ss << "[FD] ";
 
         ss << "\n";
 
