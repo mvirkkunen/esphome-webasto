@@ -1,4 +1,5 @@
 #include "webasto.h"
+#include "webasto_tables.h"
 
 #include <sstream>
 #include <unordered_map>
@@ -14,12 +15,9 @@
 namespace esphome {
 namespace webasto {
 
-extern const std::unordered_map<int, const char*> STATE_NAMES;
-
 #define TAG "webasto"
 
 const Bytes CMD_START_COMM =   { 0x81, 0x51, 0xf1, 0x81, 0x44 };
-const Bytes CMD_SET_MODE =     { 0x82, 0x51, 0xf1, 0x31, 0x03, 0xf8 };
 const Bytes CMD_READ_STATE_1 = { 0x83, 0x51, 0xf1, 0x2a, 0x01, 0x01, 0xf1 };
 const Bytes CMD_READ_STATE_2 = { 0x83, 0x51, 0xf1, 0x2a, 0x01, 0x02, 0xf2 };
 const Bytes CMD_READ_FAULTS =  { 0x81, 0x51, 0xf1, 0xa1, 0x64 };
@@ -37,7 +35,6 @@ enum class WebastoComponent::CommState {
     INIT_BREAK_2, // 25ms
     INIT_SLEEP_2, // 100ms
     INIT_START_COMM,
-    INIT_SET_MODE,
     READ_STATE_1,
     READ_STATE_2,
     READ_FAULTS,
@@ -134,10 +131,6 @@ uint32_t WebastoComponent::comm_state_enter() {
             send_command(CMD_START_COMM);
             return CMD_TIMEOUT;
 
-        case CommState::INIT_SET_MODE:
-            send_command(CMD_SET_MODE);
-            return CMD_TIMEOUT;
-
         case CommState::READ_STATE_1:
             send_command(CMD_READ_STATE_1);
             return CMD_TIMEOUT;
@@ -184,14 +177,6 @@ WebastoComponent::CommState WebastoComponent::comm_state_complete(const Bytes& r
                 return (init_attempts > 3) ? CommState::INIT_START_SYNC : CommState::INIT_START_COMM;
             }
 
-            return CommState::INIT_SET_MODE;
-
-        case CommState::INIT_SET_MODE:
-            if (reply.size() < 7) {
-                ESP_LOGE(TAG, "invalid reply length for INIT_SET_MODE: %d", reply.size());
-                return CommState::INIT_START_SYNC;
-            }
-
             return CommState::READ_STATE_1;
 
         case CommState::READ_STATE_1:
@@ -200,7 +185,7 @@ WebastoComponent::CommState WebastoComponent::comm_state_complete(const Bytes& r
                 return CommState::INIT_START_SYNC;
             }
 
-            state.temperature = static_cast<int>(reply[5]) - 40;
+            state.temperature = static_cast<int>(TEMPERATURE_CURVE[reply[5]]);
             state.flame_detector = 204.8f / (204.8f - static_cast<float>(reply[6])) - 1.0f;
             state.supply_voltage = static_cast<float>(reply[7]) * 0.068275;
             state.operating_state = reply[9];
@@ -246,7 +231,7 @@ WebastoComponent::CommState WebastoComponent::comm_state_complete(const Bytes& r
                     reply[7],
                     reply[8],
                     reply[9],
-                    static_cast<int>(reply[10]) - 40,
+                    static_cast<int>(TEMPERATURE_CURVE[reply[10]]),
                 });
 
                 return CommState::MORE_FAULTS;
@@ -324,8 +309,8 @@ void WebastoComponent::update_sensors() {
         std::ostringstream ss;
         ss << "Operating state: " << state.operating_state << " - ";
 
-        auto it = STATE_NAMES.find(state.operating_state);
-        if (it != STATE_NAMES.end()) {
+        auto it = OPERATING_STATE_NAME.find(state.operating_state);
+        if (it != OPERATING_STATE_NAME.end()) {
             ss << it->second;
         } else {
             ss << "Unknown state";
@@ -373,131 +358,6 @@ void WebastoComponent::set_break(bool break_) {
 void WebastoSwitch::write_state(bool state) {
     parent->write_switch_state(state);
 }
-
-const std::unordered_map<int, const char*> STATE_NAMES = {
-    { 0, "Off state" },
-    { 1, "Flame detector interrogation 1" },
-    { 2, "Glowing 1" },
-    { 3, "Glowing 11" },
-    { 4, "Prestart fuel supply 1" },
-    { 5, "Fuel supply 11" },
-    { 6, "Fuel supply 12" },
-    { 7, "Fuel supply 13" },
-    { 8, "Fuel supply 15" },
-    { 9, "Stabilization time" },
-    { 10, "Fuel supply 14" },
-    { 11, "Flame detector measuring phase 1" },
-    { 12, "Glow plug ramp 1" },
-    { 16, "Flame detector interrogation 2" },
-    { 17, "Glow plug ramp 2" },
-    { 18, "Glow plug ramp 3" },
-    { 21, "Combustion process full load" },
-    { 22, "Load change FL-PL 1" },
-    { 23, "Load change FL-PL 2" },
-    { 24, "Combustion process part load" },
-    { 25, "Load change PL-FL 1" },
-    { 26, "Load change PL-FL 2" },
-    { 27, "Burn out 31" },
-    { 28, "Burn out 32" },
-    { 29, "Glowing 21" },
-    { 30, "Fuel supply 25" },
-    { 32, "Burn out 22" },
-    { 33, "Burn out 23" },
-    { 34, "Burn out 24" },
-    { 35, "Control idle period 1" },
-    { 36, "Control idle period 2" },
-    { 37, "Glowing 4" },
-    { 38, "Glowing 5" },
-    { 39, "Glowing 6" },
-    { 40, "Prestart fuel supply 2" },
-    { 41, "Fuel supply 42" },
-    { 42, "Fuel supply 33" },
-    { 43, "Flame detector measuring phase 2" },
-    { 44, "Fuel supply 34" },
-    { 45, "Flame detector measuring phase 3" },
-    { 48, "Ventilating" },
-    { 49, "Fan idle" },
-    { 50, "Cooling 2" },
-    { 51, "Interlock" },
-    { 52, "Heater interlock" },
-    { 53, "Burn out 11" },
-    { 54, "Burn out 12" },
-    { 55, "Burn out 13" },
-    { 56, "Burn out 14" },
-    { 57, "Burn out 41" },
-    { 58, "Burn out 42" },
-    { 59, "Burn out 51" },
-    { 60, "Burn out 61" },
-    { 61, "Burn out 71" },
-    { 63, "Cooling 1" },
-    { 64, "Deactivation" },
-    { 65, "Heater interlock deactivation" },
-    { 66, "Interlock save to memory" },
-    { 67, "Flame detector interrogation 3" },
-    { 68, "Cooling 3" },
-    { 69, "Cooling 4" },
-    { 70, "Glowing 10" },
-    { 71, "Idle time save to memory" },
-    { 72, "Burn out 25" },
-    { 73, "Burn out 15" },
-    { 74, "Burn out 16" },
-    { 75, "Flame detector interrogation 4" },
-    { 76, "Prestart fuel supply 4" },
-    { 77, "Prestart fuel supply 5" },
-    { 78, "Prestart fuel supply 3" },
-    { 80, "Off state" },
-    { 81, "Flame detector interrogation 1" },
-    { 82, "Glowing 1" },
-    { 83, "Prestart fuel supply 1" },
-    { 84, "Fuel supply 11" },
-    { 85, "Flame detector measuring phase 1" },
-    { 86, "Glowing 2" },
-    { 87, "Glowing 3" },
-    { 88, "Fuel supply 21" },
-    { 89, "Glowing 10" },
-    { 90, "Glowing 11" },
-    { 91, "Flame detector interrogation 2" },
-    { 92, "Glow plug ramp 1" },
-    { 93, "Glow plug ramp 2" },
-    { 96, "Flame detector measuring phase 2" },
-    { 97, "Combustion process full load" },
-    { 98, "Load change FL-PL 1" },
-    { 99, "Load change FL-PL 2" },
-    { 100, "Combustion process part load" },
-    { 101, "Load change PL-FL 1" },
-    { 102, "Load change PL-FL 2" },
-    { 103, "Burn out 32" },
-    { 104, "Burn out 22" },
-    { 105, "Burn out 23" },
-    { 112, "Burn out 24" },
-    { 113, "Cooling 3" },
-    { 114, "Control idle period 2" },
-    { 115, "Cooling 4" },
-    { 116, "Glowing 4" },
-    { 117, "Fuel supply 33" },
-    { 118, "Flame detector measuring phase 3" },
-    { 119, "Ventilating" },
-    { 120, "Cooling 2" },
-    { 121, "Interlock" },
-    { 122, "Glow plug ramp 3" },
-    { 123, "Glow plug ramp 4" },
-    { 128, "Heater interlock" },
-    { 129, "Burn out 11" },
-    { 130, "Burn out 12" },
-    { 131, "Burn out 13" },
-    { 132, "Cooling 1" },
-    { 133, "Deactivation" },
-    { 134, "Heater interlock deactivation" },
-    { 135, "Interlock save to memory" },
-    { 136, "Idle time save to memory" },
-    { 137, "Burn out 25" },
-    { 138, "Burn out 15" },
-    { 139, "Flame detector interrogation 3" },
-    { 140, "Flame detector interrogation 4" },
-    { 141, "Glowing 5" },
-    { 142, "Fuel supply 42" },
-    { 143, "Flame detector measuring phase 4" },
-};
 
 }
 }
