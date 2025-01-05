@@ -1,0 +1,40 @@
+external_components:
+  - source:
+      type: local
+      path: external_components
+
+esphome:
+  name: webasto
+
+esp32:
+  board: nodemcu-32s
+  framework:
+    type: arduino
+
+logger:
+
+api:
+  ...
+
+ota:
+  ...
+
+wifi:
+  ...
+
+uart:
+  baud_rate: 10400
+  tx_pin: 22
+  rx_pin: 23
+
+webasto:
+  heater:
+    name: "Webasto Heater"
+  temperature:
+    name: "Webasto Temperature"
+  battery_voltage:
+    name: "Webasto Battery Voltage"
+  faults:
+    name: "Webasto Faults"
+  diagnostics:
+    name: "Webasto Diagnostics"
