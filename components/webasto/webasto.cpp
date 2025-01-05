@@ -49,6 +49,10 @@ enum class WebastoComponent::CommState {
 void WebastoComponent::setup() {
     heater_sync = true;
     comm_state = CommState::START;
+
+    if (faults_sensor) {
+        faults_sensor->publish_state("");
+    }
 }
 
 void WebastoComponent::loop() {
@@ -109,6 +113,11 @@ uint32_t WebastoComponent::comm_state_enter() {
         case CommState::INIT_START_SYNC:
             ESP_LOGD(TAG, "attempting to connect...");
             init_attempts = 0;
+
+            if (connected_sensor) {
+                connected_sensor->publish_state(false);
+            }
+
             return 3000;
 
         case CommState::INIT_BREAK_1:
@@ -217,6 +226,7 @@ WebastoComponent::CommState WebastoComponent::comm_state_complete(const Bytes& r
             return CommState::READ_FAULTS;
 
         case CommState::READ_FAULTS:
+        case CommState::MORE_FAULTS:
             if (reply.size() < 8) {
                 ESP_LOGE(TAG, "invalid reply length for READ_FAULTS: %d", reply.size());
                 return CommState::INIT_START_SYNC;
@@ -249,10 +259,6 @@ WebastoComponent::CommState WebastoComponent::comm_state_complete(const Bytes& r
                 return CommState::INIT_START_SYNC;
             }
 
-            if (heater_switch) {
-                heater_switch->publish_state(heater_on);
-            }
-
             heater_sync = true;
 
             return CommState::READ_STATE_1;
@@ -279,12 +285,16 @@ WebastoComponent::CommState WebastoComponent::comm_state_complete(const Bytes& r
 }
 
 void WebastoComponent::update_sensors() {
+    if (connected_sensor) {
+        connected_sensor->publish_state(true);
+    }
+
     if (temperature_sensor && temperature_sensor->get_state() != state.temperature) {
         temperature_sensor->publish_state(state.temperature);
     }
 
-    if (battery_voltage_sensor && battery_voltage_sensor->get_state() != state.supply_voltage) {
-        battery_voltage_sensor->publish_state(state.supply_voltage);
+    if (supply_voltage_sensor && supply_voltage_sensor->get_state() != state.supply_voltage) {
+        supply_voltage_sensor->publish_state(state.supply_voltage);
     }
 
     if (faults_sensor) {
@@ -356,6 +366,10 @@ void WebastoComponent::send_command(const Bytes& cmd) {
 void WebastoComponent::write_switch_state(bool state) {
     heater_on = state;
     heater_sync = false;
+
+    if (heater_switch) {
+        heater_switch->publish_state(heater_on);
+    }
 
     if (comm_state == CommState::POLL_SLEEP) {
         state_timeout = 0;

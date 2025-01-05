@@ -4,8 +4,30 @@
 #      path: components
 
 external_components:
-  - source: github://mvirkkunen/esphome-webasto
+  - source: github://mvirkkunen/esphome-webasto@v0.1.3
     components: [ webasto ]
+
+output:
+  - platform: gpio
+    pin: 18
+    id: heater_led
+  - platform: slow_pwm
+    pin: 19
+    id: fault_led
+    period: 1s
+
+binary_sensor:
+  - platform: gpio
+    name: "Local button"
+    internal: true
+    pin:
+      number: 21
+      mode:
+        input: true
+        pullup: true
+      inverted: true
+    on_press:
+      - switch.toggle: heater_switch
 
 uart:
   baud_rate: 10400
@@ -13,14 +35,41 @@ uart:
   rx_pin: 23
 
 webasto:
-  update_interval: 1500ms
+  connected:
+    id: connected_sensor
+    name: "Webasto Connected"
+    on_state:
+      then:
+        - script.execute: update_fault_led
   heater:
+    id: heater_switch
     name: "Webasto Heater"
+    on_turn_on:
+      then:
+        - output.turn_on: heater_led
+    on_turn_off:
+      then:
+        - output.turn_off: heater_led
   temperature:
     name: "Webasto Temperature"
-  battery_voltage:
+  supply_voltage:
     name: "Webasto Battery Voltage"
   faults:
+    id: faults_sensor
     name: "Webasto Faults"
+    on_value:
+      then:
+        - script.execute: update_fault_led
   diagnostics:
     name: "Webasto Diagnostics"
+
+script:
+  - id: update_fault_led
+    mode: restart
+    then:
+      - lambda: |-
+          id(fault_led).set_level(
+            !id(connected_sensor).state ? 0.5f
+            : !id(faults_sensor).state.empty() ? 1.0f
+            : 0.0f
+          );
