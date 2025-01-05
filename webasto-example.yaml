@@ -1,26 +1,7 @@
 external_components:
   - source:
       type: local
-      path: external_components
-
-esphome:
-  name: webasto
-
-esp32:
-  board: nodemcu-32s
-  framework:
-    type: arduino
-
-logger:
-
-api:
-  ...
-
-ota:
-  ...
-
-wifi:
-  ...
+      path: components
 
 uart:
   baud_rate: 10400
