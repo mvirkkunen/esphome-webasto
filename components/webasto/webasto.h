@@ -20,7 +20,6 @@ struct WebastoFault {
 };
 
 struct WebastoState {
-    bool is_on = false;
     unsigned operating_state = 0;
     int temperature = 0;
     float flame_detector = 0.0f;

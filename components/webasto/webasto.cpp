@@ -17,6 +17,8 @@ namespace webasto {
 
 #define TAG "webasto"
 
+void appendFaults(std::ostringstream& ss, const std::vector<WebastoFault>& faults);
+
 const Bytes CMD_START_COMM =   { 0x81, 0x51, 0xf1, 0x81, 0x44 };
 const Bytes CMD_READ_STATE_1 = { 0x83, 0x51, 0xf1, 0x2a, 0x01, 0x01, 0xf1 };
 const Bytes CMD_READ_STATE_2 = { 0x83, 0x51, 0xf1, 0x2a, 0x01, 0x02, 0xf2 };
@@ -198,8 +200,8 @@ WebastoComponent::CommState WebastoComponent::comm_state_complete(const Bytes& r
             }
 
             state.combustion_air_fan = static_cast<float>(reply[5]) / 255.0f;
-            state.glow_plug = static_cast<float>(reply[6]);
-            state.fuel_pump = 1.0f / static_cast<float>(reply[8]);
+            state.glow_plug = reply[6];
+            state.fuel_pump = reply[8] == 0 ? 0.0f : (1.0f / static_cast<float>(reply[8]));
 
             state.combustion_air_fan_on = reply[9] & 0x01;
             state.glow_plug_on = reply[9] & 0x02;
@@ -287,17 +289,7 @@ void WebastoComponent::update_sensors() {
 
     if (faults_sensor) {
         std::ostringstream ss;
-
-        int index = 1;
-        for (auto& fault : state.faults) {
-            ss
-                << index << ". "
-                << fault.major_code << "/" << fault.minor_code
-                << " (counter: " << fault.counter
-                << ", state: " << fault.operating_state
-                << ", temperature: " << fault.temperature << "°C)\r\n";
-            index++;
-        }
+        appendFaults(ss, state.faults);
 
         std::string state = ss.str();
         if (state != faults_sensor->get_state()) {
@@ -307,6 +299,7 @@ void WebastoComponent::update_sensors() {
 
     if (diagnostics_sensor) {
         std::ostringstream ss;
+
         ss << "Operating state: " << state.operating_state << " - ";
 
         auto it = OPERATING_STATE_NAME.find(state.operating_state);
@@ -316,10 +309,33 @@ void WebastoComponent::update_sensors() {
             ss << "Unknown state";
         }
 
-        ss << "\r\n";
+        ss << "\n";
 
-        ss << "Heater on: " << (state.is_on ? "yes" : "no") << "\r\n";
-        ss << "Temperature: " << state.temperature << "°C\r\n";
+        ss << "Supply voltage: " << state.supply_voltage << " V\n";
+        ss << "Temperature: " << state.temperature << " °C\n";
+        ss << "Combustion air fan: " << static_cast<int>(state.combustion_air_fan * 100.0f) << " %\n";
+        ss << "Fuel pump: " << state.fuel_pump << " Hz\n";
+        ss << "Glow plug: " << state.glow_plug << " %\n";
+        ss << "Flame detector: " << state.flame_detector << " Ω\n";
+
+        if (state.combustion_air_fan_on) ss << " [CAF]";
+        if (state.fuel_pump_on) ss << " [FP]";
+        if (state.glow_plug_on) ss << " [GP]";
+        if (state.circulating_pump_on) ss << " [CP]";
+        if (state.vehicle_fan_relay_on) ss << " [VFR]";
+        if (state.main_switch_on) ss << " [MS]";
+        if (state.supplemental_heater_request) ss << " [SHR]";
+        if (state.summer) ss << " [S]";
+        if (state.flame_detected) ss << " [FD]";
+
+        ss << "\n";
+
+        if (state.faults.empty()) {
+            ss << "No faults.\n";
+        } else {
+            ss << state.faults.size() << "fault(s):\n";
+            appendFaults(ss, state.faults);
+        }
 
         std::string state = ss.str();
         if (state != diagnostics_sensor->get_state()) {
@@ -357,6 +373,19 @@ void WebastoComponent::set_break(bool break_) {
 
 void WebastoSwitch::write_state(bool state) {
     parent->write_switch_state(state);
+}
+
+void appendFaults(std::ostringstream& ss, const std::vector<WebastoFault>& faults) {
+    int index = 1;
+    for (auto& fault : faults) {
+        ss
+            << index << ". "
+            << fault.major_code << "/" << fault.minor_code
+            << " (counter: " << fault.counter
+            << ", state: " << fault.operating_state
+            << ", temperature: " << fault.temperature << "°C)\n";
+        index++;
+    }
 }
 
 }
